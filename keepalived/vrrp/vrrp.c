@@ -856,8 +856,8 @@ vrrp_auth_ext_verify(vrrp_t *vrrp, const vrrphdr_t *hd, size_t pkt_len, const vr
 	int half_window;
 
 	if (!trailer) {
-		if (!ah->enforce)
-			return VRRP_PACKET_OK;	/* migration mode accepts legacy adverts */
+		if (ah->mode != VRRP_AUTH_HMAC_ENFORCE)
+			return VRRP_PACKET_OK;	/* migration modes accept trailerless adverts */
 		++vrrp->stats->auth_ext_missing;
 		log_rate_limited_error(vrrp, VRRP_RLFLAG_AUTH_EXT_MISSING, "(%s) missing authentication trailer from %s", vrrp->iname, inet_sockaddrtos(&vrrp->pkt_saddr));
 		return VRRP_PACKET_KO;
@@ -3365,9 +3365,9 @@ vrrp_complete_instance(vrrp_t * vrrp)
 			vrrp_auth_hmac_free(ah);
 			vrrp->auth_hmac = NULL;
 		} else {
-			if (vrrp->strict_mode && !ah->enforce) {
+			if (vrrp->strict_mode && ah->mode != VRRP_AUTH_HMAC_ENFORCE) {
 				report_config_error(CONFIG_GENERAL_ERROR, "(%s) strict mode requires auth_hmac mode enforce", vrrp->iname);
-				ah->enforce = true;
+				ah->mode = VRRP_AUTH_HMAC_ENFORCE;
 			}
 
 			/* Derive the freshness window from the advert interval when unset */

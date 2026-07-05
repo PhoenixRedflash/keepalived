@@ -807,7 +807,7 @@ dump_vrrp(FILE *fp, const vrrp_t *vrrp)
 			num_keys++;
 		conf_write(fp, "   Authentication extension = HMAC-SHA256-128");
 		conf_write(fp, "     Keys = %u, active key id = %u", num_keys, ah->active_key);
-		conf_write(fp, "     Mode = %s", ah->enforce ? "enforce" : "permissive");
+		conf_write(fp, "     Mode = %s", vrrp_auth_hmac_mode_str(ah->mode));
 		if (ah->anti_replay_time)
 			conf_write(fp, "     Anti replay = time, window = %u sec", ah->time_window);
 		else

@@ -2038,9 +2038,12 @@ The syntax for vrrp_instance is :
         #   Defaults to max(3 x advert_int, 5).
         \fBtime_window \fR5
 
-        # enforce|permissive (default enforce). permissive also accepts
-        #   adverts with no trailer, for migration only. Flip every node
-        #   to enforce once authenticated adverts flow both ways.
+        # enforce|permissive|receive-only (default enforce). The two
+        #   migration modes also accept adverts with no trailer, and
+        #   receive-only additionally sends none, so a group gains
+        #   verification before anyone signs. Roll out in three sweeps,
+        #   receive-only then permissive then enforce, each sweep is
+        #   hitless with no timing constraint.
         \fBmode \fRenforce
     }
 

@@ -1518,7 +1518,7 @@ vrrp_auth_hmac_handler(__attribute__((unused)) const vector_t *strvec)
 	PMALLOC(ah);
 	INIT_LIST_HEAD(&ah->keys);
 	ah->ext_type = VRRP_AUTH_HMAC_TYPE_SHA256;
-	ah->enforce = true;
+	ah->mode = VRRP_AUTH_HMAC_ENFORCE;
 	ah->anti_replay_time = true;
 	current_vrrp->auth_hmac = ah;
 }
@@ -1673,11 +1673,13 @@ vrrp_auth_hmac_mode_handler(const vector_t *strvec)
 		return;
 
 	if (!strcmp(str, "enforce"))
-		ah->enforce = true;
+		ah->mode = VRRP_AUTH_HMAC_ENFORCE;
 	else if (!strcmp(str, "permissive"))
-		ah->enforce = false;
+		ah->mode = VRRP_AUTH_HMAC_PERMISSIVE;
+	else if (!strcmp(str, "receive-only"))
+		ah->mode = VRRP_AUTH_HMAC_RECEIVE_ONLY;
 	else
-		report_config_error(CONFIG_GENERAL_ERROR, "(%s) auth_hmac mode '%s' must be enforce or permissive", current_vrrp->iname, str);
+		report_config_error(CONFIG_GENERAL_ERROR, "(%s) auth_hmac mode '%s' must be enforce, permissive or receive-only", current_vrrp->iname, str);
 }
 #endif
 static void

@@ -151,6 +151,19 @@ pdu_hmac(const vrrp_auth_key_t *key, const uint8_t *pseudo,
 	compute_hmac(key->data, key->len, seg, 5, digest);
 }
 
+const char *
+vrrp_auth_hmac_mode_str(vrrp_auth_hmac_mode_t mode)
+{
+	switch (mode) {
+	case VRRP_AUTH_HMAC_RECEIVE_ONLY:
+		return "receive-only";
+	case VRRP_AUTH_HMAC_PERMISSIVE:
+		return "permissive";
+	default:
+		return "enforce";
+	}
+}
+
 vrrp_auth_key_t *
 vrrp_auth_hmac_find_key(const vrrp_auth_hmac_t *ah, uint8_t id)
 {
@@ -203,7 +216,10 @@ vrrp_auth_hmac_free(vrrp_auth_hmac_t *ah)
 size_t
 vrrp_auth_hmac_trailer_len(const vrrp_t *vrrp)
 {
-	return vrrp->auth_hmac ? sizeof(vrrp_auth_ext_t) : 0;
+	if (!vrrp->auth_hmac || vrrp->auth_hmac->mode == VRRP_AUTH_HMAC_RECEIVE_ONLY)
+		return 0;
+
+	return sizeof(vrrp_auth_ext_t);
 }
 
 /*
@@ -277,7 +293,7 @@ vrrp_auth_hmac_sign(vrrp_t *vrrp)
 	size_t pdu_off;
 	uint64_t seq;
 
-	if (!ah)
+	if (!ah || ah->mode == VRRP_AUTH_HMAC_RECEIVE_ONLY)
 		return;
 
 	pdu_off = (vrrp->family == AF_INET) ? sizeof(struct iphdr) : 0;

@@ -57,6 +57,18 @@
 #define VRRP_AUTH_HMAC_PSEUDO_LEN	20
 
 /*
+ * Sender and receiver behaviour. receive-only verifies a present trailer but
+ * sends none, so a group gains verification before anyone signs, which makes
+ * the migration hitless. permissive signs but still accepts trailerless
+ * adverts. enforce requires a valid trailer.
+ */
+typedef enum {
+	VRRP_AUTH_HMAC_RECEIVE_ONLY,
+	VRRP_AUTH_HMAC_PERMISSIVE,
+	VRRP_AUTH_HMAC_ENFORCE,
+} vrrp_auth_hmac_mode_t;
+
+/*
  * Authenticated trailer appended after the VRRP PDU. The 64 bit sequence is
  * split into seconds, subseconds and counter, keeping the 28 byte layout.
  */
@@ -100,7 +112,7 @@ typedef struct _vrrp_auth_hmac {
 	list_head_t		keys;		/* vrrp_auth_key_t */
 	uint8_t			active_key;	/* key id used when sending */
 	uint8_t			ext_type;	/* scheme used when sending */
-	bool			enforce;	/* false accepts legacy adverts during migration */
+	vrrp_auth_hmac_mode_t	mode;		/* migration modes accept legacy adverts */
 	bool			anti_replay_time;	/* true enforces the freshness window */
 	unsigned		time_window;	/* freshness window, seconds */
 
@@ -126,6 +138,7 @@ typedef enum {
 struct _vrrp_t;
 
 /* prototypes */
+extern const char *vrrp_auth_hmac_mode_str(vrrp_auth_hmac_mode_t) __attribute__ ((const));
 extern vrrp_auth_key_t *vrrp_auth_hmac_add_key(vrrp_auth_hmac_t *, unsigned, const uint8_t *, size_t);
 extern vrrp_auth_key_t *vrrp_auth_hmac_find_key(const vrrp_auth_hmac_t *, uint8_t) __attribute__ ((pure));
 extern void vrrp_auth_hmac_free(vrrp_auth_hmac_t *);
