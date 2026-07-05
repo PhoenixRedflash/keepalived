@@ -41,20 +41,26 @@
 #define SHA256_BLOCK_SIZE	64
 #define SHA256_DIGEST_LEN	32
 
+/* One HMAC input segment, substitution happens by segmenting the message */
+typedef struct _hmac_seg {
+	const uint8_t		*data;
+	size_t			len;
+} hmac_seg_t;
+
 /*
- * HMAC SHA256 over up to three message segments following rfc2104. The manual
+ * HMAC SHA256 over a segmented message following rfc2104. The manual
  * ipad/opad construction mirrors the legacy hmac_md5 so it stays portable
  * across the OpenSSL versions keepalived already supports.
  */
 static void
 compute_hmac(const uint8_t *key, size_t key_len,
-	     const uint8_t *s1, size_t l1, const uint8_t *s2, size_t l2,
-	     const uint8_t *s3, size_t l3, uint8_t *digest)
+	     const hmac_seg_t *seg, unsigned nseg, uint8_t *digest)
 {
 	EVP_MD_CTX *ctx;
 	unsigned char k_ipad[SHA256_BLOCK_SIZE];
 	unsigned char k_opad[SHA256_BLOCK_SIZE];
 	unsigned char tk[SHA256_DIGEST_LEN];
+	unsigned n;
 	int i;
 
 	/* A failed allocation leaves a zero digest so verification fails safely */
@@ -86,10 +92,8 @@ compute_hmac(const uint8_t *key, size_t key_len,
 	/* inner pass: H(K xor ipad, message) */
 	EVP_DigestInit_ex(ctx, EVP_sha256(), NULL);
 	EVP_DigestUpdate(ctx, k_ipad, SHA256_BLOCK_SIZE);
-	EVP_DigestUpdate(ctx, s1, l1);
-	EVP_DigestUpdate(ctx, s2, l2);
-	if (s3)
-		EVP_DigestUpdate(ctx, s3, l3);
+	for (n = 0; n < nseg; n++)
+		EVP_DigestUpdate(ctx, seg[n].data, seg[n].len);
 	EVP_DigestFinal_ex(ctx, digest, NULL);
 
 	/* outer pass: H(K xor opad, inner) */
@@ -122,6 +126,29 @@ build_pseudo(uint8_t *out, sa_family_t family, uint8_t version, uint8_t vrid, co
 		memcpy(out + 4, &PTR_CAST_CONST(struct sockaddr_in6, sa)->sin6_addr, 16);
 	else
 		memcpy(out + 4, &PTR_CAST_CONST(struct sockaddr_in, sa)->sin_addr, 4);
+}
+
+/*
+ * HMAC input of the draft: pseudo header, then the PDU through the trailer
+ * prefix with the VRRP checksum field read as zero, then a zeroed HMAC field.
+ * Segmenting substitutes the zeros without touching the packet, so the kernel
+ * written IPv6 checksum no longer desynchronizes sender and receiver.
+ */
+static void
+pdu_hmac(const vrrp_auth_key_t *key, const uint8_t *pseudo,
+	 const uint8_t *pdu, size_t len, uint8_t *digest)
+{
+	static const uint8_t zero[VRRP_AUTH_HMAC_LEN];
+	size_t csum_off = offsetof(vrrphdr_t, chksum);
+	hmac_seg_t seg[5] = {
+		{ pseudo, VRRP_AUTH_HMAC_PSEUDO_LEN },
+		{ pdu, csum_off },
+		{ zero, sizeof(uint16_t) },
+		{ pdu + csum_off + sizeof(uint16_t), len - csum_off - sizeof(uint16_t) },
+		{ zero, sizeof(zero) },
+	};
+
+	compute_hmac(key->data, key->len, seg, 5, digest);
 }
 
 vrrp_auth_key_t *
@@ -270,9 +297,8 @@ vrrp_auth_hmac_sign(vrrp_t *vrrp)
 		return;		/* a zero hmac is rejected by every receiver */
 
 	build_pseudo(pseudo, vrrp->family, vrrp->version, vrrp->vrid, &vrrp->saddr);
-	compute_hmac(key->data, key->len, pseudo, sizeof(pseudo),
-		     PTR_CAST(uint8_t, vrrp->send_buffer) + pdu_off,
-		     vrrp->send_buffer_size - pdu_off, NULL, 0, digest);
+	pdu_hmac(key, pseudo, PTR_CAST(uint8_t, vrrp->send_buffer) + pdu_off,
+		 vrrp->send_buffer_size - pdu_off - VRRP_AUTH_HMAC_LEN, digest);
 	memcpy(tr->hmac, digest, VRRP_AUTH_HMAC_LEN);
 }
 
@@ -329,7 +355,6 @@ vrrp_auth_hmac_result_t
 vrrp_auth_hmac_check(vrrp_t *vrrp, const void *pdu, size_t pdu_len,
 		     const vrrp_auth_ext_t *tr, vrrp_replay_state_t *uni_state, int *skew)
 {
-	static const uint8_t zero_hmac[VRRP_AUTH_HMAC_LEN];
 	vrrp_auth_hmac_t *ah = vrrp->auth_hmac;
 	vrrp_auth_key_t *key;
 	vrrp_replay_state_t *state;
@@ -366,9 +391,7 @@ vrrp_auth_hmac_check(vrrp_t *vrrp, const void *pdu, size_t pdu_len,
 		return VRRP_AUTH_HMAC_UNKNOWN_KEY;
 
 	build_pseudo(pseudo, vrrp->family, vrrp->version, vrrp->vrid, &vrrp->pkt_saddr);
-	compute_hmac(key->data, key->len, pseudo, sizeof(pseudo),
-		     pdu, pdu_len + offsetof(vrrp_auth_ext_t, hmac),
-		     zero_hmac, sizeof(zero_hmac), digest);
+	pdu_hmac(key, pseudo, pdu, pdu_len + offsetof(vrrp_auth_ext_t, hmac), digest);
 	if (memcmp_constant_time(tr->hmac, digest, VRRP_AUTH_HMAC_LEN))
 		return VRRP_AUTH_HMAC_BAD_HMAC;
 
