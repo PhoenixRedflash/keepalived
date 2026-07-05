@@ -1,3 +1,4 @@
 tcp_server
 tcp_client
 regex_partial_test
+auth_hmac_test
