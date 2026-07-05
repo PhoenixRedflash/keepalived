@@ -62,7 +62,7 @@ keys under the same key ids, since the construction is symmetric and
 provisioning the key material to each node is your responsibility. With no
 `mode` set the block enforces, so a node rejects any advert that lacks a valid
 trailer. To bring the extension up on a running cluster without dropping
-adverts, start in permissive mode while you roll out, as described below.
+adverts, start in receive-only mode while you roll out, as described below.
 
 The two nodes carry a near-mirror configuration, the active on `198.51.100.10`
 and the backup on `192.0.2.10`. Only the `state`, the `priority` and the unicast
@@ -253,27 +253,30 @@ reboot, and its adverts are rejected until the sequence catches up.
 
 ## Rolling out without breaking the cluster
 
-A Keepalived that does not understand the trailer drops any advert that carries
-one, because the receive path checks the exact length and fails closed. Sequence
-the migration so no node sends a signed advert to a node that cannot yet accept
-it.
+A Keepalived that does not understand the trailer, or that has no `auth_hmac`
+block yet, drops any advert that carries one, because the receive path checks
+the exact length and fails closed. Sequence the migration so no node sends a
+signed advert to a node that cannot yet accept it. The three modes make each
+sweep hitless, with no timing constraint between reloads.
 
 1. Upgrade the binary on every node first, with no configuration change, so
    nothing signs and the cluster behaves as before.
-2. Add the `auth_hmac` block in `mode permissive` everywhere, then reload the
-   nodes in a tight sweep. A reloaded node signs and, being permissive, still
-   accepts unsigned adverts from peers not yet reloaded. Keep the sweep well
-   under the master down interval, since a not yet reloaded peer drops the
-   signed adverts and a long sweep risks a needless election.
-3. Confirm every node now sends and verifies trailers. Authenticated adverts
+2. Add the `auth_hmac` block in `mode receive-only` everywhere and reload each
+   node. Nothing changes on the wire, every node now holds the keys and can
+   verify a trailer, and adverts without one are still accepted.
+3. Switch `mode permissive` everywhere and reload each node. A reloaded node
+   signs, and every peer already accepts its trailer, whether that peer still
+   runs receive-only or is already permissive.
+4. Confirm every node now sends and verifies trailers. Authenticated adverts
    flow both ways, though an unsigned injected advert is still accepted while
-   you stay permissive.
-4. Switch `mode enforce` everywhere and reload again. Every peer already signs,
+   any node stays below enforce.
+5. Switch `mode enforce` everywhere and reload again. Every peer already signs,
    so nothing drops, and from now on an advert without a valid trailer is
    rejected.
 
-`strict_mode` requires `enforce`, so finish the migration before turning strict
-mode on.
+Keep the intermediate sweeps reasonably short anyway, because the extension only
+delivers its guarantees once every node enforces. `strict_mode` requires
+`enforce`, so finish the migration before turning strict mode on.
 
 ## Rotating keys
 
@@ -295,7 +298,7 @@ that receivers already accept, then drop the retired key and reload once more.
 
 Keepalived logs and counts each authentication outcome per instance, rate
 limited, so you can watch the migration and spot trouble. A missing trailer is
-informational in permissive mode and means a node is not signing once you
+informational in the migration modes and means a node is not signing once you
 enforce. An invalid HMAC points at a key mismatch or a forgery attempt. A stale
 trailer is reported apart from an invalid HMAC, so you can tell clock drift from
 an attack, and a clock skew warning fires on accepted adverts once the skew
@@ -314,7 +317,7 @@ reference. The keywords are:
 | `active_key <id>` | 1 to 255 | none | the id used when signing |
 | `anti_replay` | `time` or `monotonic` | `time` | `time` needs synced clocks |
 | `time_window <sec>` | 1 to 300 | `max(3 x advert_int, 5)` | freshness window, `time` mode only |
-| `mode` | `enforce` or `permissive` | `enforce` | start `permissive` to migrate |
+| `mode` | `enforce`, `permissive` or `receive-only` | `enforce` | start `receive-only` to migrate |
 
 ## Security notes
 
@@ -330,6 +333,12 @@ across IPv4, IPv6, and the unicast TTL handling. The trailer adds
 many virtual addresses fit in a packet, so on an instance whose address list
 sits near the interface MTU a few addresses move to the excluded set rather than
 overflowing the packet.
+
+The extension complements the TTL 255 on-link proof, it does not replace it.
+Multicast keeps that check as VRRP requires. A unicast pair on a shared link can
+keep it too by sending with `unicast_ttl 255` and checking with `min_ttl 255` on
+each peer, so only multi-hop unicast across a routed or overlay network runs
+without it, which is exactly the deployment the HMAC was designed to protect.
 
 ## IETF draft { #ietf-draft }
 
