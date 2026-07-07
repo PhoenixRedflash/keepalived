@@ -107,6 +107,7 @@ nav:
     - ChangeLog: documentation/changelog.md
   - Release Notes:
     - release-notes/index.md
+    - Release 2.4.2: release-notes/Release-2.4.2.md
     - Release 2.4.1: release-notes/Release-2.4.1.md
     - Release 2.4.0: release-notes/Release-2.4.0.md
     - Release 2.3.4: release-notes/Release-2.3.4.md
