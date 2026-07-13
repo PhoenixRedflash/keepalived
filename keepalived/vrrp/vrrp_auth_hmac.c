@@ -269,8 +269,20 @@ static uint64_t
 next_seq(vrrp_auth_hmac_t *ah)
 {
 	uint64_t clk = clock_seq();
+	int32_t ahead;
 
-	if (seq_after(clk, ah->send_seq))
+	if (seq_after(clk, ah->send_seq)) {
+		ah->send_seq = clk;
+		return ah->send_seq;
+	}
+
+	/*
+	 * A corrected clock step strands the timestamp beyond what receivers
+	 * accept, so time mode restarts from the clock once past the window.
+	 * Monotonic mode keeps strict growth, its only freshness guarantee.
+	 */
+	ahead = (int32_t)((uint32_t)(ah->send_seq >> 32) - (uint32_t)(clk >> 32));
+	if (ah->anti_replay_time && ahead > (int32_t)ah->time_window)
 		ah->send_seq = clk;
 	else
 		ah->send_seq++;
