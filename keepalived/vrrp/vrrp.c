@@ -1655,14 +1655,6 @@ vrrp_send_pkt(vrrp_t * vrrp, unicast_peer_t *peer)
 	struct iovec iov;
 	char cbuf[256] __attribute__((aligned(__alignof__(struct cmsghdr))));
 
-#ifdef _WITH_VRRP_AUTH_
-	/*
-	 * Sign the trailer per transmitted packet so each receiver sees a
-	 * strictly growing sequence
-	 */
-	vrrp_auth_hmac_sign(vrrp);
-#endif
-
 	/* Build the message data */
 	memset(&msg, 0, sizeof(msg));
 	msg.msg_iov = &iov;
@@ -1736,6 +1728,15 @@ vrrp_send_adv(vrrp_t * vrrp, uint8_t prio)
 
 	/* build the packet */
 	vrrp_update_pkt(vrrp, prio, NULL);
+
+#ifdef _WITH_VRRP_AUTH_
+	/*
+	 * Sign once per logical advertisement so every peer copy carries the
+	 * same sequence and HMAC, only the destination and the checksum it
+	 * feeds may differ between copies
+	 */
+	vrrp_auth_hmac_sign(vrrp);
+#endif
 
 	/* Send the packet, but don't log an error if it is a prio 0 message
 	 * and the interface is down. */

@@ -279,8 +279,9 @@ next_seq(vrrp_auth_hmac_t *ah)
 }
 
 /*
- * Fill and sign the trailer at the tail of the send buffer. Called per
- * transmitted packet so each receiver observes a strictly growing sequence.
+ * Fill and sign the trailer at the tail of the send buffer. Called once per
+ * logical advertisement, the copies replicated to unicast peers carry the
+ * same sequence and HMAC since the HMAC input excludes the destination.
  */
 void
 vrrp_auth_hmac_sign(vrrp_t *vrrp)
