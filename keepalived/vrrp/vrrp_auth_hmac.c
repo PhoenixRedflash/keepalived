@@ -365,8 +365,22 @@ mcast_state(vrrp_auth_hmac_t *ah, const sockaddr_t *addr)
  * under serial number arithmetic so it survives the field wrap.
  */
 static bool
-replay_ok(vrrp_replay_state_t *state, uint64_t seq)
+replay_ok(vrrp_auth_hmac_t *ah, vrrp_replay_state_t *state, uint64_t seq)
 {
+	struct timespec ts;
+	int32_t age;
+
+	/*
+	 * A mark outside the window only orders packets the window already
+	 * rejects, expiring it recovers a sender reset after a clock step.
+	 */
+	if (state->valid && ah->anti_replay_time) {
+		clock_gettime(CLOCK_REALTIME, &ts);
+		age = (int32_t)((uint32_t)ts.tv_sec - (uint32_t)(state->seq >> 32));
+		if (age > (int)ah->time_window || age < -(int)ah->time_window)
+			state->valid = false;
+	}
+
 	if (state->valid && !seq_after(seq, state->seq))
 		return false;
 
@@ -425,7 +439,7 @@ vrrp_auth_hmac_check(vrrp_t *vrrp, const void *pdu, size_t pdu_len,
 		return VRRP_AUTH_HMAC_BAD_HMAC;
 
 	state = uni_state ? uni_state : mcast_state(ah, &vrrp->pkt_saddr);
-	if (!replay_ok(state, seq))
+	if (!replay_ok(ah, state, seq))
 		return VRRP_AUTH_HMAC_REPLAY;
 
 	return VRRP_AUTH_HMAC_OK;
