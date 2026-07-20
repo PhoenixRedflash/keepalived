@@ -17,7 +17,7 @@ infrastructures, and it runs in production across data centers, ISPs and
 hardware vendors worldwide.
 </p>
 
-[:material-bullhorn: Latest release **2.4.2** · July 2026 :octicons-arrow-right-24:](release-notes/Release-2.4.2.md){ .ka-latest }
+[:material-bullhorn: Latest release **2.4.3** · July 2026 :octicons-arrow-right-24:](release-notes/Release-2.4.3.md){ .ka-latest }
 
 [:material-newspaper-variant-outline: Latest article **VRRP HMAC Authentication** · June 2026 :octicons-arrow-right-24:](articles/vrrp-hmac-authentication.md){ .ka-latest }
 

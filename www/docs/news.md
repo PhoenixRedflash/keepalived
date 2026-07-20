@@ -6,6 +6,7 @@ history of changes, read the [Release Notes](release-notes/index.md) and the
 
 ## 2026
 
+- **July 20 · Release 2.4.3**. A point release that hardens `auth_hmac` against clock steps, where a forward step stranded sender and receiver past the freshness window. The signed input is unchanged, so 2.4.3 interoperates with 2.4.2. [Release Notes](release-notes/Release-2.4.3.md)
 - **July 7 · Release 2.4.2**. A point release that fixes IPv6 `auth_hmac`, which never verified, and adds a receive-only mode for hitless migration. The signed input changed again, so upgrade every node in a virtual router together. [Release Notes](release-notes/Release-2.4.2.md)
 - **June 26 · Release 2.4.1**. A point release that aligns the `auth_hmac` VRRP extension with the updated IETF Internet-Draft. The trailer format and terminology changed, so upgrade every node in a virtual router together. [Release Notes](release-notes/Release-2.4.1.md)
 - **June 22 · Release 2.4.0**. A major release adding the `auth_hmac` VRRP authentication extension, a broad security hardening pass, and a rebuilt website. [Release Notes](release-notes/Release-2.4.0.md)

@@ -4,6 +4,7 @@ Detailed notes for every Keepalived release, grouped into New features,
 Improvements and Fixes. For the historical record, the old
 [ChangeLog](../documentation/changelog.md) is still available.
 
+- [**Release 2.4.3**](Release-2.4.3.md) `20th July 2026`
 - [**Release 2.4.2**](Release-2.4.2.md) `7th July 2026`
 - [**Release 2.4.1**](Release-2.4.1.md) `26th June 2026`
 - [**Release 2.4.0**](Release-2.4.0.md) `22nd June 2026`
